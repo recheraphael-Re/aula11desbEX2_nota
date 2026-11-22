@@ -1,5 +1,12 @@
-name: Testes Java
-on: [push, pull_request]
+name: Build e testes Java
+on:
+  push:
+    branches: [main, develop, 'feature/**']
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
   testes:
     runs-on: ubuntu-latest
@@ -10,4 +17,13 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - run: mvn -B verify
+      - name: Compilar, testar e empacotar
+        run: mvn -B verify
+      - name: Disponibilizar JAR e resultados dos testes
+        uses: actions/upload-artifact@v4
+        with:
+          name: biblioteca
+          path: |
+            target/*.jar
+            target/surefire-reports/TEST-*.xml
+          if-no-files-found: error
