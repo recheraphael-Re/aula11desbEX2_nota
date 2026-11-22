@@ -1,83 +1,50 @@
 # Exercício 2 — Biblioteca
 
-Aplicação Java 21 e Spring Boot da CloudTech Solutions. Interface JSON conforme o enunciado da Aula 11.
+API Java 21 e Spring Boot para listar, cadastrar, consultar e atualizar os livros do acervo da CloudTech Solutions.
 
 ## 1. Executar
 
-Requisitos: JDK 21 e Maven 3.9 (comandos executados nesta pasta).
+Na raiz deste repositório, use JDK 21 e Maven 3.9:
 
 ```powershell
-mvn clean verify
+mvn -B verify
 mvn spring-boot:run
 ```
 
-Acesse http://localhost:8081. Use Ctrl+C para encerrar. Os cadastros e o histórico ficam em memória: ao reiniciar, os dados são apagados. IDs são gerados pelo servidor. Não há autenticação; esta é uma aplicação didática.
+A API responde em `http://localhost:8081`. Para executar o JAR empacotado, use `java -jar target/biblioteca-1.0.0.jar`.
 
 ## 2. Endpoints
 
-| Método | Caminho | HTTP esperado |
+| Método | Caminho | Resultado esperado |
 | --- | --- | --- |
-| GET | `/` | 200 |
-| GET | `/livros` | 200 |
-| POST | `/livros/cadastrar` | 201 |
-| PUT | `/livros/alterar/1` | 200 |
-| GET | `/livros/1` | 200 |
-| GET | `/documentacao` | 200 |
+| GET | `/` | 200, mensagem de boas-vindas |
+| GET | `/livros` | 200, lista do acervo, incluindo livros emprestados |
+| POST | `/livros/cadastrar` | 201, livro cadastrado com o ID gerado |
+| PUT | `/livros/alterar/{id}` | 200, livro atualizado com o mesmo ID |
+| GET | `/livros/{id}` | 200, dados do livro, ou 404 para ID inexistente |
+| GET | `/documentacao` | 200, lista dos endpoints |
 
-Cadastro e alteração recebem JSON. Campos obrigatórios vazios, números negativos de produção e horários inválidos retornam 400. IDs inexistentes retornam 404. Alteração de livro usa PUT com todos os campos. A listagem de livros inclui todos os status para gerenciamento do acervo.
+O POST e o PUT recebem `titulo`, `autor`, `editora`, `ano`, `categoria` e `status` em JSON. Informe `Disponível` ou `Emprestado` no campo `status`. Dados inválidos retornam 400 e o PUT retorna 404 quando o livro não existe.
 
-## 3. Reproduzir no terminal
+Modelos ficam em `models`, rotas em `controller` e o gerenciamento do acervo em `service`. A aplicação lê `data/biblioteca.json` na inicialização e grava o arquivo após cadastros e alterações. Os dados e os IDs são preservados ao reiniciar com o mesmo arquivo. Configure `APP_DATA_FILE` para escolher outro caminho.
 
-Com a aplicação em execução, abra outro terminal nesta pasta:
+## 3. Testes
 
-```powershell
-curl.exe -i -X POST http://localhost:8081/livros/cadastrar -H "Content-Type: application/json" --data-binary "@tests/livro.json"
-curl.exe -i -X PUT http://localhost:8081/livros/alterar/1 -H "Content-Type: application/json" --data-binary "@tests/livro-alterado.json"
-curl.exe http://localhost:8081/livros/1
-```
+`mvn -B verify` executa o JUnit 5 com MockMvc e gera o JAR. O relatório da execução fica em `target/surefire-reports/`. Os testes usam um arquivo temporário próprio.
 
-Em uma execução nova, o primeiro cadastro recebe `id: 1`. Cadastro retorna HTTP 201 e os campos enviados junto com o ID. Consulta retorna HTTP 200. Após o PUT, a consulta retorna ano 2024 e status Emprestado, mantendo o ID.
+Siga [tests/requisicoes.http](tests/requisicoes.http) para reproduzir as chamadas no Thunder Client, incluindo a consulta que retorna 404. Use **Body → JSON** para o POST e o PUT e substitua o ID de exemplo pelo ID do cadastro. Capture método, URL, código HTTP e resposta. Repita as chamadas com o domínio da API publicada.
 
-## 4. Testes e Thunder Client
+## 4. GitHub Actions e Railway
 
-`mvn test` executa testes de integração com MockMvc: endpoints, fluxo de cadastro e consulta, alteração de livro, entrada inválida e ID inexistente.
+O [workflow](.github/workflows/pipeline.yml) roda no GitHub em push e pull request. Ele prepara o Java 21, executa `mvn -B verify` e disponibiliza o JAR e os XMLs do Surefire como artefatos.
 
-Em `tests/requisicoes.http` estão as requisições na ordem de execução. No Thunder Client, crie uma requisição por bloco, copie método e URL e selecione Body > JSON nos POST/PUT. Compare o HTTP esperado e capture as respostas para entrega. Os testes automáticos não substituem as capturas solicitadas pelo professor.
-
-## 5. Erros comuns e soluções
-
-| Erro | Solução |
-| --- | --- |
-| Porta ocupada | Encerre a outra aplicação ou use `mvn spring-boot:run -Dspring-boot.run.arguments=--server.port=8090`. |
-| 400 | Confira os campos e tipos do JSON; horário deve ser `08:30`. |
-| 404 | Cadastre primeiro e use o ID retornado. |
-| 405 | Confira o método HTTP na tabela. |
-| Dados desapareceram | O armazenamento é em memória; recadastre após reiniciar. |
-| Maven falha ao baixar dependências | Verifique conexão e configuração do Maven. |
-
-## 6. GitHub, CI e execução em contêiner
-
-O workflow `.github/workflows/pipeline.yml` executa `mvn verify` em push e pull request. Para ativá-lo, publique o conteúdo desta pasta como raiz de um repositório próprio. O workflow valida o projeto; a publicação web precisa ser configurada em um provedor.
+Para testar o contêiner localmente:
 
 ```powershell
-git init
-git add .
-git commit -m "Implementa aplicação CloudTech da aula 11"
-git branch -M main
-# Depois de criar um repositório vazio no GitHub, substitua a URL:
-git remote add origin https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-git push -u origin main
 docker build -t cloudtech-biblioteca .
 docker run --rm -p 8081:8081 cloudtech-biblioteca
 ```
 
-Sugestões de branches para novas alterações: `feature/cadastro`, `feature/testes`, `feature/docker`, `feature/pipeline-cicd`, `feature/monitoramento`. Faça commits reais durante a evolução do trabalho.
+Na Railway, conecte este repositório à branch `main` e ative **Wait for CI** para o deploy automático aguardar os testes. A API usa a variável `PORT` e assume `8081` em execução local. Gere um domínio público e valide `/`, `/documentacao` e as rotas de livros. Se precisar preservar dados entre redeploys, use uma única instância com um volume em `/app/data`.
 
-## 7. Checklist de entrega
-
-- [ ] Executar `mvn clean verify`.
-- [ ] Testar cada endpoint no Thunder Client e guardar capturas.
-- [ ] Publicar o repositório com histórico de commits.
-- [ ] Conferir a execução do GitHub Actions.
-- [ ] Publicar a aplicação em ambiente web quando exigido.
-- [ ] Informar links reais e evidências no relatório.
+Use o [relatório](RELATORIO.md) para registrar as evidências da entrega.
